@@ -4,11 +4,12 @@ Modern frontend application for Librería Coquito management system, built with 
 
 ## Tech Stack
 
-- **React** - UI library
+- **React 19** - UI library
 - **TypeScript** - Static typing
 - **Vite** - Build tool and dev server
 - **Fetch API** - HTTP client
-- **CSS** - Styling (flexible for Bootstrap/Tailwind)
+- **React Router** - Navigation
+- **CSS** - Styling
 
 ## Installation and Setup
 
