@@ -5,6 +5,7 @@ import {
   createCategory,
   updateCategory,
   deleteCategory,
+  toggleCategory,
 } from '../../api/categoryApi';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
@@ -16,6 +17,9 @@ const CategoriesPage = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Filter state
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   
   // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -39,18 +43,24 @@ const CategoriesPage = () => {
 
   useEffect(() => {
     fetchCategories();
-  }, [currentPage]);
+  }, [currentPage, statusFilter]); // Recargar cuando cambie la página o el filtro
 
   const fetchCategories = async () => {
     console.log('🔄 Iniciando llamada a la API de categorías...', {
       page: currentPage,
       size: pageSize,
+      filter: statusFilter,
     });
     
     setLoading(true);
     setError(null);
     try {
-      const response = await getCategories(currentPage, pageSize);
+      // Determinar el valor del parámetro 'active' según el filtro
+      const activeParam = statusFilter === 'all' 
+        ? undefined 
+        : statusFilter === 'active';
+      
+      const response = await getCategories(currentPage, pageSize, activeParam);
       
       console.log('✅ Respuesta exitosa de la API:', response);
       
@@ -178,7 +188,30 @@ const CategoriesPage = () => {
       setSelectedCategory(null);
       fetchCategories();
     } catch (err: any) {
-      setError(err.message || 'Error al eliminar la categoría');
+      // Manejar error específico de productos activos
+      if (err.message.includes('active product')) {
+        setError(`No se puede desactivar: ${err.message}`);
+      } else {
+        setError(err.message || 'Error al desactivar la categoría');
+      }
+      setIsDeleteModalOpen(false);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleToggle = async (category: Category) => {
+    setSubmitting(true);
+    try {
+      await toggleCategory(category.id);
+      fetchCategories();
+    } catch (err: any) {
+      // Manejar error específico de productos activos al intentar desactivar
+      if (err.message.includes('active product')) {
+        setError(`No se puede desactivar "${category.name}": Tiene productos activos asociados. Desactívalos primero.`);
+      } else {
+        setError(err.message || 'Error al cambiar el estado de la categoría');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -212,7 +245,7 @@ const CategoriesPage = () => {
     {
       key: 'actions',
       label: 'Acciones',
-      width: '200px',
+      width: '250px',
       render: (category: Category) => (
         <div className="actions-cell">
           <Button
@@ -224,6 +257,17 @@ const CategoriesPage = () => {
             }}
           >
             Editar
+          </Button>
+          <Button
+            size="small"
+            variant={category.active ? 'danger' : 'success'}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleToggle(category);
+            }}
+            disabled={submitting}
+          >
+            {category.active ? 'Desactivar' : 'Activar'}
           </Button>
           <Button
             size="small"
@@ -258,6 +302,45 @@ const CategoriesPage = () => {
           <button onClick={() => setError(null)}>×</button>
         </div>
       )}
+
+      {/* Filtros de estado */}
+      <div className="filters-section">
+        <div className="filter-group">
+          <label className="filter-label">Estado:</label>
+          <div className="filter-buttons">
+            <Button
+              size="small"
+              variant={statusFilter === 'all' ? 'primary' : 'secondary'}
+              onClick={() => {
+                setStatusFilter('all');
+                setCurrentPage(0); // Reset a primera página al cambiar filtro
+              }}
+            >
+              Todas
+            </Button>
+            <Button
+              size="small"
+              variant={statusFilter === 'active' ? 'success' : 'secondary'}
+              onClick={() => {
+                setStatusFilter('active');
+                setCurrentPage(0);
+              }}
+            >
+              Activas
+            </Button>
+            <Button
+              size="small"
+              variant={statusFilter === 'inactive' ? 'danger' : 'secondary'}
+              onClick={() => {
+                setStatusFilter('inactive');
+                setCurrentPage(0);
+              }}
+            >
+              Inactivas
+            </Button>
+          </div>
+        </div>
+      </div>
 
       {loading ? (
         <div className="loading-container">
@@ -433,16 +516,17 @@ const CategoriesPage = () => {
           setIsDeleteModalOpen(false);
           setSelectedCategory(null);
         }}
-        title="Confirmar Eliminación"
+        title="Confirmar Desactivación"
         size="small"
       >
         <div className="delete-confirmation">
           <p>
-            ¿Estás seguro de que deseas eliminar la categoría{' '}
+            ¿Estás seguro de que deseas desactivar la categoría{' '}
             <strong>{selectedCategory?.name}</strong>?
           </p>
           <p className="delete-warning">
-            Esta acción no se puede deshacer.
+            La categoría se marcará como inactiva y no aparecerá en las listas activas.
+            No se puede desactivar si tiene productos activos asociados.
           </p>
           
           <div className="form-actions">
@@ -461,7 +545,7 @@ const CategoriesPage = () => {
               onClick={handleDelete}
               disabled={submitting}
             >
-              {submitting ? 'Eliminando...' : 'Eliminar'}
+              {submitting ? 'Desactivando...' : 'Desactivar'}
             </Button>
           </div>
         </div>

@@ -7,13 +7,22 @@ const CATEGORY_ENDPOINT = API_ENDPOINTS.CATEGORIES;
 
 /**
  * Get all categories with pagination
+ * @param page - Page number (0-indexed)
+ * @param size - Items per page
+ * @param active - Optional filter: true for active only, false for inactive only, undefined for all
  */
 export const getCategories = async (
   page: number = 0,
-  size: number = 10
+  size: number = 10,
+  active?: boolean
 ): Promise<PaginatedResponse<Category>> => {
+  const params: any = { page, size };
+  if (active !== undefined) {
+    params.active = active;
+  }
+  
   const response = await http.get<PaginatedResponse<Category>>(CATEGORY_ENDPOINT, {
-    params: { page, size },
+    params,
   });
   
   console.log('✅ Respuesta del backend recibida:', {
@@ -96,10 +105,26 @@ export const updateCategory = async (
 };
 
 /**
- * Delete category
+ * Delete category (Soft Delete - marks as inactive)
  */
 export const deleteCategory = async (id: number): Promise<void> => {
   return http.delete<void>(`${CATEGORY_ENDPOINT}/${id}`);
+};
+
+/**
+ * Toggle category active status (activate/deactivate)
+ * @param id - Category ID
+ * @returns Updated category with new status
+ */
+export const toggleCategory = async (id: number): Promise<Category> => {
+  const toggled = await http.patch<Category>(`${CATEGORY_ENDPOINT}/${id}/toggle`);
+  console.log('✅ Estado de categoría alternado:', {
+    id: toggled.id,
+    name: toggled.name,
+    active: toggled.active,
+    nuevoEstado: toggled.active ? 'ACTIVA' : 'INACTIVA',
+  });
+  return toggled;
 };
 
 /**
